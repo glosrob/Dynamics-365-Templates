@@ -1,10 +1,12 @@
-﻿using Microsoft.Xrm.Sdk;
+﻿using Microsoft.Crm.Sdk.Messages;
+using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace XRT.Dynamics365.Templates
 {
@@ -443,6 +445,116 @@ namespace XRT.Dynamics365.Templates
                 });
             return collection;
         }
+
+        /// <summary>
+        /// Adds an Entity to a queue.
+        /// </summary>
+        /// <param name="target">A reference to the Entity to be added to a queue.</param>
+        /// <param name="queueName">The name of the queue to add the Entity to.</param>
+        public void AddToQueue(EntityReference target, string queueName)
+        {
+            var queryResults = QueryByValue("queue", new ColumnSet(false), "name", queueName);
+            if (queryResults == null || queryResults.Entities == null || !queryResults.Entities.Any())
+            {
+                throw new InvalidPluginExecutionException($"AddToQueue: Could not find a queue with the name '{queueName}'.");
+            }
+            AddToQueue(target, queryResults.Entities.First().Id);
+        }
+
+        /// <summary>
+        /// Adds an Entity to a queue.
+        /// </summary>
+        /// <param name="target">A reference to the Entity to be added to a queue.</param>
+        /// <param name="queueId">The Id of the queue to add the Entity to.</param>
+        public void AddToQueue(EntityReference target, Guid queueId)
+        {
+            if (target == null)
+            {
+                throw new ArgumentNullException("target", "AddToQueue method has a null parameter.");
+            }
+
+            if (queueId == Guid.Empty)
+            {
+                throw new ArgumentNullException("queueId", "AddToQueue method has an empty parameter.");
+            }
+
+            PerformAction(
+                $"AddToQueue [{target.Id} / {target.LogicalName} to {queueId}]",
+                () =>
+                {
+                    var addToQueue = new AddToQueueRequest()
+                    {
+                        DestinationQueueId = queueId,
+                        Target = target
+                    };
+                    Service.Execute(addToQueue);
+                });
+        }
+
+        /// <summary>
+        /// Gets an entity ID from a record url.
+        /// </summary>
+        /// <param name="url">The URL to parse the ID from.</param>
+        /// <returns>An entity ID taken from the record URL.</returns>
+        public Guid GetIdFromRecordURL(string url)
+        {
+            var idRegex = new Regex("id=([0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12})");
+            var idMatch = idRegex.Match(url);
+            if (idMatch.Groups.Count == 0 || !idMatch.Groups[0].Success)
+            {
+                return Guid.Empty;
+            }
+
+            var id = idMatch.Groups[0].Value.Replace("id=", "");
+            return Guid.Parse(id);
+        }
+
+        /// <summary>
+        /// Gets an ETC from a record url.
+        /// </summary>
+        /// <param name="url">The URL to parse the ETC from.</param>
+        /// <returns>An entity ETC taken from the record URL.</returns>
+        public int GetETCFromRecordURL(string url)
+        {
+            var etcRegex = new Regex("etc=[0-9]+");
+            var etcMatch = etcRegex.Match(url);
+            if (etcMatch.Groups.Count == 0 || !etcMatch.Groups[0].Success)
+            {
+                return -1;
+            }
+
+            var etc = etcMatch.Groups[0].Value.Replace("etc=", "");
+            return int.Parse(etc);
+        }
+        
+        /// <summary>
+        /// Creates an Activity Party.
+        /// </summary>
+        /// <param name="target">The target Entity to use to create the Activity Party.</param>
+        /// <returns>The Activity Party created.</returns>
+        public EntityCollection CreateActivityParty(Entity target)
+        {
+            if (target == null)
+            {
+                throw new ArgumentNullException("target", "CreateActivityParty method has a null parameter.");
+            }
+            return CreateActivityParty(target.ToEntityReference());
+        }
+
+        /// <summary>
+        /// Creates an Activity Party.
+        /// </summary>
+        /// <param name="target">The target EntityReference to use to create the Activity Party.</param>
+        /// <returns>The Activity Party created.</returns>
+        public EntityCollection CreateActivityParty(EntityReference target)
+        {
+            var collection = new EntityCollection();
+            var party = new Entity("activityparty");
+            party.Attributes.Add("partyid", target);
+            collection.Entities.Add(party);
+            return collection;
+        }
+
 
         //Helpers
 
