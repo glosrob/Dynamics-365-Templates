@@ -316,7 +316,7 @@ namespace XRT.Dynamics365.Templates
         public OrgServiceHelper(IOrganizationService service, Action<string> trace, bool doTrace = false)
         {
             Service = service;
-            DoTrace = DoTrace;
+            DoTrace = doTrace;
             Trace = trace;
         }
 
